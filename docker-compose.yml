@@ -31,6 +31,19 @@ services:
     networks:
       - x-store-network
 
+  docs:
+    build:
+      context: ./docs
+      dockerfile: Dockerfile
+    container_name: x-store-docs
+    restart: always
+    ports:
+      - "3001:3000"
+    depends_on:
+      - backend
+    networks:
+      - x-store-network
+
 networks:
   x-store-network:
     driver: bridge

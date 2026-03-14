@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# X-Store 项目启动脚本
-# 使用方式: ./start.sh [backend|frontend|admin|docs|all|stop|restart]
+# X-Store 开发环境启动脚本（不依赖 Docker）
+# 使用方式: ./dev-start.sh [backend|frontend|admin|docs|all|stop|restart]
 
 set -e
 
@@ -10,41 +10,23 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
+BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
-echo -e "${GREEN}========================================${NC}"
-echo -e "${GREEN}  X-Store 项目启动脚本${NC}"
-echo -e "${GREEN}========================================${NC}"
+echo -e "${BLUE}========================================${NC}"
+echo -e "${BLUE}  X-Store 开发环境启动脚本${NC}"
+echo -e "${BLUE}  (不依赖 Docker)${NC}"
+echo -e "${BLUE}========================================${NC}"
 
-# 检查 PostgreSQL 连接
-check_postgres() {
-    echo -e "${YELLOW}检查 PostgreSQL 连接...${NC}"
-    if docker run --rm -e PGPASSWORD='Postgres@2026' postgres:15 psql -h host.docker.internal -p 5432 -U admin -d x_store -c "SELECT 1" > /dev/null 2>&1; then
-        echo -e "${GREEN}✓ PostgreSQL 连接成功${NC}"
-        return 0
-    else
-        echo -e "${RED}✗ PostgreSQL 连接失败${NC}"
-        echo -e "${YELLOW}请确保 PostgreSQL 已启动并配置正确${NC}"
-        return 1
-    fi
-}
 
-# 检查 Redis 连接
-check_redis() {
-    echo -e "${YELLOW}检查 Redis 连接...${NC}"
-    if docker exec x-store-redis redis-cli ping > /dev/null 2>&1; then
-        echo -e "${GREEN}✓ Redis 连接成功${NC}"
-        return 0
+# 获取本机 IP
+get_local_ip() {
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+        # macOS
+        ifconfig | grep "inet " | grep -v 127.0.0.1 | awk '{print $2}' | head -1
     else
-        echo -e "${YELLOW}⚠ Redis 未启动，启动 Redis 容器...${NC}"
-        docker run -d --name x-store-redis -p 6379:6379 redis:7-alpine > /dev/null 2>&1
-        if docker exec x-store-redis redis-cli ping > /dev/null 2>&1; then
-            echo -e "${GREEN}✓ Redis 启动成功${NC}"
-            return 0
-        else
-            echo -e "${RED}✗ Redis 启动失败${NC}"
-            return 1
-        fi
+        # Linux
+        hostname -I | awk '{print $1}'
     fi
 }
 
@@ -59,15 +41,14 @@ start_backend() {
         go build -o x-store-backend ./cmd/main.go
     fi
     
-    # 启动后端
-    # 获取本机 IP（兼容 macOS 和 Linux）
-    LOCAL_IP=$(ifconfig | grep "inet " | grep -v 127.0.0.1 | awk '{print $2}' | head -1 | cut -d: -f2)
+    LOCAL_IP=$(get_local_ip)
     
     echo -e "${GREEN}✓ 后端服务启动成功${NC}"
-    echo -e "${YELLOW}📍 访问地址: ${CYAN}http://localhost:8082${NC}"
+    echo -e "${YELLOW}📍 本地访问: ${CYAN}http://localhost:8082${NC}"
     echo -e "${YELLOW}🌐 外网访问: ${CYAN}http://${LOCAL_IP}:8082${NC}"
-    echo -e "${YELLOW}📖 API 文档: ${CYAN}http://localhost:8082/api/categories${NC}"
+    echo -e "${YELLOW}📖 API 测试: ${CYAN}http://localhost:8082/api/categories${NC}"
     echo ""
+    
     ./x-store-backend
 }
 
@@ -82,13 +63,14 @@ start_frontend() {
         npm install
     fi
     
-    LOCAL_IP=$(ifconfig | grep "inet " | grep -v 127.0.0.1 | awk '{print $2}' | head -1 | cut -d: -f2)
+    LOCAL_IP=$(get_local_ip)
     
     echo -e "${GREEN}✓ C 端前台启动成功${NC}"
-    echo -e "${YELLOW}📍 访问地址: ${CYAN}http://localhost:3000${NC}"
+    echo -e "${YELLOW}📍 本地访问: ${CYAN}http://localhost:3000${NC}"
     echo -e "${YELLOW}🌐 外网访问: ${CYAN}http://${LOCAL_IP}:3000${NC}"
     echo -e "${YELLOW}🛒 商城首页: ${CYAN}http://localhost:3000${NC}"
     echo ""
+    
     npm run dev
 }
 
@@ -103,13 +85,14 @@ start_admin() {
         npm install
     fi
     
-    LOCAL_IP=$(ifconfig | grep "inet " | grep -v 127.0.0.1 | awk '{print $2}' | head -1 | cut -d: -f2)
+    LOCAL_IP=$(get_local_ip)
     
     echo -e "${GREEN}✓ 管理后台启动成功${NC}"
-    echo -e "${YELLOW}📍 访问地址: ${CYAN}http://localhost:5174${NC}"
+    echo -e "${YELLOW}📍 本地访问: ${CYAN}http://localhost:5174${NC}"
     echo -e "${YELLOW}🌐 外网访问: ${CYAN}http://${LOCAL_IP}:5174${NC}"
     echo -e "${YELLOW}⚙️  管理面板: ${CYAN}http://localhost:5174${NC}"
     echo ""
+    
     npm run dev
 }
 
@@ -124,13 +107,14 @@ start_docs() {
         npm install
     fi
     
-    LOCAL_IP=$(ifconfig | grep "inet " | grep -v 127.0.0.1 | awk '{print $2}' | head -1 | cut -d: -f2)
+    LOCAL_IP=$(get_local_ip)
     
     echo -e "${GREEN}✓ 文档站启动成功${NC}"
-    echo -e "${YELLOW}📍 访问地址: ${CYAN}http://localhost:3001${NC}"
+    echo -e "${YELLOW}📍 本地访问: ${CYAN}http://localhost:3001${NC}"
     echo -e "${YELLOW}🌐 外网访问: ${CYAN}http://${LOCAL_IP}:3001${NC}"
     echo -e "${YELLOW}📚 项目文档: ${CYAN}http://localhost:3001${NC}"
     echo ""
+    
     npm start
 }
 
@@ -172,15 +156,35 @@ stop_all() {
     stop_service "管理后台" 5174
     stop_service "文档站点" 3001
     
-    # 停止 Docker 容器
-    if docker ps -q --filter "name=x-store-" | grep -q .; then
-        echo -e "${YELLOW}停止 Docker 容器...${NC}"
-        docker stop $(docker ps -q --filter "name=x-store-") 2>/dev/null || true
-        echo -e "${GREEN}✓ Docker 容器已停止${NC}"
+    echo ""
+    echo -e "${GREEN}所有服务已停止${NC}"
+}
+
+# 检查开发环境
+check_dev_env() {
+    echo -e "${BLUE}检查开发环境...${NC}"
+    echo ""
+    
+    # 检查 Go
+    if command -v go >/dev/null 2>&1; then
+        echo -e "${GREEN}✓ Go: $(go version)${NC}"
+    else
+        echo -e "${RED}✗ Go 未安装${NC}"
+        echo -e "${CYAN}安装: https://go.dev/dl/${NC}"
+    fi
+    
+    # 检查 Node.js
+    if command -v node >/dev/null 2>&1; then
+        echo -e "${GREEN}✓ Node.js: $(node --version)${NC}"
+    else
+        echo -e "${RED}✗ Node.js 未安装${NC}"
+        echo -e "${CYAN}安装: https://nodejs.org/${NC}"
     fi
     
     echo ""
-    echo -e "${GREEN}所有服务已停止${NC}"
+    echo -e "${CYAN}💡 提示: PostgreSQL 和 Redis 需要独立安装和启动${NC}"
+    echo -e "${CYAN}   数据库配置在 backend/config.yaml 中设置${NC}"
+    echo ""
 }
 
 # 主逻辑
@@ -189,23 +193,15 @@ main() {
     
     case $MODE in
         backend)
-            check_postgres || exit 1
-            check_redis
             start_backend
             ;;
         frontend)
-            check_postgres || exit 1
-            check_redis
             start_frontend
             ;;
         admin)
-            check_postgres || exit 1
-            check_redis
             start_admin
             ;;
         docs)
-            check_postgres || exit 1
-            check_redis
             start_docs
             ;;
         all)
@@ -213,18 +209,18 @@ main() {
             echo -e "${YELLOW}请在不同终端分别运行:${NC}"
             echo ""
             echo -e "${CYAN}🖥️  后端服务 (Go + Gin):${NC}"
-            echo -e "  ${GREEN}./start.sh backend${NC}  - http://localhost:8082"
+            echo -e "  ${GREEN}./dev-start.sh backend${NC}  - http://localhost:8082"
             echo ""
             echo -e "${CYAN}🛍️  C 端商城 (Next.js):${NC}"
-            echo -e "  ${GREEN}./start.sh frontend${NC} - http://localhost:3000"
+            echo -e "  ${GREEN}./dev-start.sh frontend${NC} - http://localhost:3000"
             echo ""
             echo -e "${CYAN}⚙️  管理后台 (React + Antd):${NC}"
-            echo -e "  ${GREEN}./start.sh admin${NC}    - http://localhost:5174"
+            echo -e "  ${GREEN}./dev-start.sh admin${NC}    - http://localhost:5174"
             echo ""
             echo -e "${CYAN}📚 项目文档 (Docusaurus):${NC}"
-            echo -e "  ${GREEN}./start.sh docs${NC}     - http://localhost:3001"
+            echo -e "  ${GREEN}./dev-start.sh docs${NC}     - http://localhost:3001"
             echo ""
-            echo -e "${YELLOW}💡 提示: 所有服务都支持外网访问，使用本机 IP 替换 localhost${NC}"
+            echo -e "${YELLOW}💡 提示: 所有服务都支持外网访问${NC}"
             ;;
         stop)
             stop_all
@@ -239,18 +235,22 @@ main() {
             echo ""
             echo -e "${YELLOW}现在请在新终端运行以下命令启动服务:${NC}"
             echo ""
-            echo -e "${CYAN}🖥️  后端服务:${NC} ${GREEN}./start.sh backend${NC}"
-            echo -e "${CYAN}🛍️  C 端商城:${NC} ${GREEN}./start.sh frontend${NC}"
-            echo -e "${CYAN}⚙️  管理后台:${NC} ${GREEN}./start.sh admin${NC}"
-            echo -e "${CYAN}📚 项目文档:${NC} ${GREEN}./start.sh docs${NC}"
+            echo -e "${CYAN}🖥️  后端服务:${NC} ${GREEN}./dev-start.sh backend${NC}"
+            echo -e "${CYAN}🛍️  C 端商城:${NC} ${GREEN}./dev-start.sh frontend${NC}"
+            echo -e "${CYAN}⚙️  管理后台:${NC} ${GREEN}./dev-start.sh admin${NC}"
+            echo -e "${CYAN}📚 项目文档:${NC} ${GREEN}./dev-start.sh docs${NC}"
+            ;;
+        check)
+            check_dev_env
             ;;
         *)
             echo -e "${RED}未知参数: $MODE${NC}"
-            echo -e "${YELLOW}使用方式: ./start.sh [backend|frontend|admin|docs|all|stop|restart]${NC}"
+            echo -e "${YELLOW}使用方式: ./dev-start.sh [backend|frontend|admin|docs|all|stop|restart|check]${NC}"
             echo -e "${YELLOW}  backend/frontend/admin/docs - 启动单个服务${NC}"
             echo -e "${YELLOW}  all - 显示所有服务启动命令${NC}"
             echo -e "${YELLOW}  stop - 停止所有服务${NC}"
             echo -e "${YELLOW}  restart - 重启所有服务${NC}"
+            echo -e "${YELLOW}  check - 检查开发环境${NC}"
             exit 1
             ;;
     esac

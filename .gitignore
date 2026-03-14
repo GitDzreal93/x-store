@@ -1,2 +1,29 @@
 # 忽略 .docs 文件夹
 .docs/
+
+# 前端依赖和构建产物
+frontend-store/node_modules/
+frontend-store/.next/
+frontend-store/out/
+frontend-store/.env.local
+frontend-store/.env.production.local
+
+# 管理后台依赖和构建产物
+admin-panel/node_modules/
+admin-panel/dist/
+
+# 后端依赖和构建产物
+backend/vendor/
+backend/x-store-backend
+backend/config.local.yaml
+
+# Docker
+docker-compose.override.yml
+
+# IDE 和系统文件
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.log
+logs/

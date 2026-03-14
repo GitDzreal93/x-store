@@ -1,0 +1,36 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: x-store-backend
+    restart: always
+    ports:
+      - "8082:8082"
+    environment:
+      - GIN_MODE=release
+    volumes:
+      - ./backend/config.yaml:/app/config.yaml
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - x-store-network
+
+  frontend:
+    build:
+      context: ./admin-panel
+      dockerfile: Dockerfile
+    container_name: x-store-admin-panel
+    restart: always
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - x-store-network
+
+networks:
+  x-store-network:
+    driver: bridge

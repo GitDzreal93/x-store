@@ -1,0 +1,29 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.idea/
+.vscode/
+
+# Node
+frontend-store/node_modules/
+frontend-store/.next/
+frontend-store/out/
+
+# Go
+backend/vendor/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Config overrides
+backend/config.local.yaml
+
+# Docker
+docker-compose.override.yml

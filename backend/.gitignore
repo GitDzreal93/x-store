@@ -1,0 +1,13 @@
+# Binary
+/x-store-backend
+/cmd/main
+
+# IDE
+.idea/
+.vscode/
+
+# Config overrides
+config.local.yaml
+
+# OS
+.DS_Store

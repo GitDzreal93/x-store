@@ -21,10 +21,10 @@ interface OrderSuccessProps {
   onClose: () => void;
   product: Product | null;
   email: string;
-  orderId?: string;
+  orderNo?: string;
 }
 
-// Mock card key for demo
+// Mock card key for demo (生产环境应从后端 API 获取)
 const MOCK_CARD_KEY = "XSTORE-GPT4-A8K2-M9XP-7LQR";
 
 export function OrderSuccess({
@@ -32,7 +32,7 @@ export function OrderSuccess({
   onClose,
   product,
   email,
-  orderId = "XS20260314001",
+  orderNo,
 }: OrderSuccessProps) {
   const [isRevealed, setIsRevealed] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
@@ -294,8 +294,12 @@ export function OrderSuccess({
                     variant="default"
                     className="flex-1"
                     onClick={() => {
-                      // TODO: Navigate to order detail
-                      console.log("View order:", orderId);
+                      // 导航到订单详情页或个人中心订单页
+                      if (orderNo) {
+                        window.location.href = `/profile?order=${orderNo}`;
+                      } else {
+                        window.location.href = "/profile";
+                      }
                     }}
                   >
                     <ExternalLink className="h-4 w-4 mr-2" />

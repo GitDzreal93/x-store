@@ -6,6 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useAuth } from '@/contexts/AuthContext';
+import { ApiError } from '@/lib/api';
+import { AlertCircle } from 'lucide-react';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8082';
 
@@ -30,8 +33,17 @@ function GoogleIcon() {
 
 export default function AuthPage() {
   const router = useRouter();
+  const { login: authLogin, register: authRegister, isAuthenticated } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [oauthProviders, setOauthProviders] = useState<{name: string; label: string; auth_url: string}[]>([]);
+
+  // 如果已登录，重定向到首页
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.push('/');
+    }
+  }, [isAuthenticated, router]);
 
   useEffect(() => {
     fetch(`${API_BASE}/api/oauth/providers`)
@@ -51,28 +63,21 @@ export default function AuthPage() {
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
+    setError(null);
+
     const formData = new FormData(e.currentTarget);
-    
+    const username = formData.get('username') as string;
+    const password = formData.get('password') as string;
+
     try {
-      const res = await fetch('/api/users/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: formData.get('username'),
-          password: formData.get('password'),
-        }),
-      });
-      
-      const data = await res.json();
-      if (data.code === 0) {
-        localStorage.setItem('token', data.data.token);
-        localStorage.setItem('user', JSON.stringify(data.data.user));
-        router.push('/profile');
+      await authLogin({ username, password });
+      router.push('/');
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.message);
       } else {
-        alert(data.message || '登录失败');
+        setError('登录失败，请稍后重试');
       }
-    } catch (error) {
-      alert('登录失败，请重试');
     } finally {
       setIsLoading(false);
     }
@@ -81,30 +86,24 @@ export default function AuthPage() {
   const handleRegister = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
+    setError(null);
+
     const formData = new FormData(e.currentTarget);
-    
+
     try {
-      const res = await fetch('/api/users/register', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          username: formData.get('username'),
-          email: formData.get('email'),
-          password: formData.get('password'),
-          nickname: formData.get('nickname'),
-        }),
+      await authRegister({
+        username: formData.get('username') as string,
+        email: formData.get('email') as string,
+        password: formData.get('password') as string,
+        nickname: formData.get('nickname') as string | undefined,
       });
-      
-      const data = await res.json();
-      if (data.code === 0) {
-        localStorage.setItem('token', data.data.token);
-        localStorage.setItem('user', JSON.stringify(data.data.user));
-        router.push('/profile');
+      router.push('/');
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.message);
       } else {
-        alert(data.message || '注册失败');
+        setError('注册失败，请稍后重试');
       }
-    } catch (error) {
-      alert('注册失败，请重试');
     } finally {
       setIsLoading(false);
     }
@@ -126,13 +125,23 @@ export default function AuthPage() {
             
             <TabsContent value="login">
               <form onSubmit={handleLogin} className="space-y-4">
+                {error && (
+                  <div className="flex items-start gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+                    <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-destructive">登录失败</p>
+                      <p className="text-xs text-destructive/80 mt-1">{error}</p>
+                    </div>
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <label className="text-sm font-medium">用户名</label>
-                  <Input name="username" placeholder="请输入用户名" required />
+                  <Input name="username" placeholder="请输入用户名" required disabled={isLoading} />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">密码</label>
-                  <Input name="password" type="password" placeholder="请输入密码" required />
+                  <Input name="password" type="password" placeholder="请输入密码" required disabled={isLoading} />
                 </div>
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? '登录中...' : '登录'}
@@ -179,21 +188,31 @@ export default function AuthPage() {
             
             <TabsContent value="register">
               <form onSubmit={handleRegister} className="space-y-4">
+                {error && (
+                  <div className="flex items-start gap-2 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+                    <AlertCircle className="h-5 w-5 text-destructive flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-destructive">注册失败</p>
+                      <p className="text-xs text-destructive/80 mt-1">{error}</p>
+                    </div>
+                  </div>
+                )}
+
                 <div className="space-y-2">
                   <label className="text-sm font-medium">用户名</label>
-                  <Input name="username" placeholder="3-32个字符" required minLength={3} maxLength={32} />
+                  <Input name="username" placeholder="3-32个字符" required minLength={3} maxLength={32} disabled={isLoading} />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">邮箱</label>
-                  <Input name="email" type="email" placeholder="your@email.com" required />
+                  <Input name="email" type="email" placeholder="your@email.com" required disabled={isLoading} />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">昵称（可选）</label>
-                  <Input name="nickname" placeholder="显示名称" />
+                  <Input name="nickname" placeholder="显示名称" disabled={isLoading} />
                 </div>
                 <div className="space-y-2">
                   <label className="text-sm font-medium">密码</label>
-                  <Input name="password" type="password" placeholder="至少6位" required minLength={6} />
+                  <Input name="password" type="password" placeholder="至少6位" required minLength={6} disabled={isLoading} />
                 </div>
                 <Button type="submit" className="w-full" disabled={isLoading}>
                   {isLoading ? '注册中...' : '注册'}

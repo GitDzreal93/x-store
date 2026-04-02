@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # X-Store 开发环境启动脚本（不依赖 Docker）
-# 使用方式: ./dev-start.sh [backend|frontend|admin|docs|all|stop|restart]
+# 使用方式: ./dev-start.sh [backend|frontend|admin|docs|all|stop|restart|check]
 
 set -e
 
@@ -18,6 +18,25 @@ echo -e "${BLUE}  X-Store 开发环境启动脚本${NC}"
 echo -e "${BLUE}  (不依赖 Docker)${NC}"
 echo -e "${BLUE}========================================${NC}"
 
+# 项目根目录（无论在什么路径执行脚本，都以脚本所在目录为根）
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# 日志目录
+LOG_DIR="${ROOT_DIR}/logs"
+mkdir -p "${LOG_DIR}"
+
+# 简单日志轮转：保留最近 5 份
+rotate_log() {
+    local file="$1"
+    if [ -f "$file" ]; then
+        for i in 5 4 3 2 1; do
+            if [ -f "${file}.${i}" ]; then
+                mv "${file}.${i}" "${file}.$((i + 1))" 2>/dev/null || true
+            fi
+        done
+        mv "$file" "${file}.1"
+    fi
+}
 
 # 获取本机 IP
 get_local_ip() {
@@ -33,7 +52,7 @@ get_local_ip() {
 # 启动后端
 start_backend() {
     echo -e "${GREEN}启动后端服务...${NC}"
-    cd backend
+    cd "${ROOT_DIR}/backend"
     
     # 检查是否需要编译
     if [ ! -f "x-store-backend" ] || [ "cmd/main.go" -nt "x-store-backend" ]; then
@@ -47,15 +66,18 @@ start_backend() {
     echo -e "${YELLOW}📍 本地访问: ${CYAN}http://localhost:8082${NC}"
     echo -e "${YELLOW}🌐 外网访问: ${CYAN}http://${LOCAL_IP}:8082${NC}"
     echo -e "${YELLOW}📖 API 测试: ${CYAN}http://localhost:8082/api/categories${NC}"
+    echo -e "${YELLOW}📝 日志文件: ${CYAN}${LOG_DIR}/backend.log${NC}"
     echo ""
     
-    ./x-store-backend
+    rotate_log "${LOG_DIR}/backend.log"
+    # 前台运行（由调用方决定是否放到后台）
+    ./x-store-backend >> "${LOG_DIR}/backend.log" 2>&1
 }
 
 # 启动 C 端前台
 start_frontend() {
     echo -e "${GREEN}启动 C 端前台...${NC}"
-    cd frontend-store
+    cd "${ROOT_DIR}/frontend-store"
     
     # 检查依赖
     if [ ! -d "node_modules" ]; then
@@ -69,15 +91,17 @@ start_frontend() {
     echo -e "${YELLOW}📍 本地访问: ${CYAN}http://localhost:3000${NC}"
     echo -e "${YELLOW}🌐 外网访问: ${CYAN}http://${LOCAL_IP}:3000${NC}"
     echo -e "${YELLOW}🛒 商城首页: ${CYAN}http://localhost:3000${NC}"
+    echo -e "${YELLOW}📝 日志文件: ${CYAN}${LOG_DIR}/frontend.log${NC}"
     echo ""
     
-    npm run dev
+    rotate_log "${LOG_DIR}/frontend.log"
+    npm run dev >> "${LOG_DIR}/frontend.log" 2>&1
 }
 
 # 启动管理后台
 start_admin() {
     echo -e "${GREEN}启动管理后台...${NC}"
-    cd admin-panel
+    cd "${ROOT_DIR}/admin-panel"
     
     # 检查依赖
     if [ ! -d "node_modules" ]; then
@@ -91,15 +115,17 @@ start_admin() {
     echo -e "${YELLOW}📍 本地访问: ${CYAN}http://localhost:5174${NC}"
     echo -e "${YELLOW}🌐 外网访问: ${CYAN}http://${LOCAL_IP}:5174${NC}"
     echo -e "${YELLOW}⚙️  管理面板: ${CYAN}http://localhost:5174${NC}"
+    echo -e "${YELLOW}📝 日志文件: ${CYAN}${LOG_DIR}/admin.log${NC}"
     echo ""
     
-    npm run dev
+    rotate_log "${LOG_DIR}/admin.log"
+    npm run dev >> "${LOG_DIR}/admin.log" 2>&1
 }
 
 # 启动文档站
 start_docs() {
     echo -e "${GREEN}启动文档站...${NC}"
-    cd docs
+    cd "${ROOT_DIR}/docs"
     
     # 检查依赖
     if [ ! -d "node_modules" ]; then
@@ -113,9 +139,11 @@ start_docs() {
     echo -e "${YELLOW}📍 本地访问: ${CYAN}http://localhost:3001${NC}"
     echo -e "${YELLOW}🌐 外网访问: ${CYAN}http://${LOCAL_IP}:3001${NC}"
     echo -e "${YELLOW}📚 项目文档: ${CYAN}http://localhost:3001${NC}"
+    echo -e "${YELLOW}📝 日志文件: ${CYAN}${LOG_DIR}/docs.log${NC}"
     echo ""
     
-    npm start
+    rotate_log "${LOG_DIR}/docs.log"
+    npm start >> "${LOG_DIR}/docs.log" 2>&1
 }
 
 # 停止服务
@@ -205,22 +233,42 @@ main() {
             start_docs
             ;;
         all)
-            echo -e "${YELLOW}启动所有服务（需要多个终端）${NC}"
-            echo -e "${YELLOW}请在不同终端分别运行:${NC}"
+            echo -e "${YELLOW}一键启动所有服务（后端 + 前台 + 管理后台 + 文档站）...${NC}"
             echo ""
-            echo -e "${CYAN}🖥️  后端服务 (Go + Gin):${NC}"
-            echo -e "  ${GREEN}./dev-start.sh backend${NC}  - http://localhost:8082"
+
+            # 在后台分别启动四个服务，每个服务在自己的子 shell 中运行，不互相干扰
+            (
+                cd "$ROOT_DIR"
+                start_backend
+            ) &
+            BACKEND_PID=$!
+
+            (
+                cd "$ROOT_DIR"
+                start_frontend
+            ) &
+            FRONTEND_PID=$!
+
+            (
+                cd "$ROOT_DIR"
+                start_admin
+            ) &
+            ADMIN_PID=$!
+
+            (
+                cd "$ROOT_DIR"
+                start_docs
+            ) &
+            DOCS_PID=$!
+
             echo ""
-            echo -e "${CYAN}🛍️  C 端商城 (Next.js):${NC}"
-            echo -e "  ${GREEN}./dev-start.sh frontend${NC} - http://localhost:3000"
+            echo -e "${GREEN}已在后台启动所有服务：${NC}"
+            echo -e "  🖥️  后端服务 (Go + Gin)        PID: ${CYAN}${BACKEND_PID}${NC}  端口: ${CYAN}8082${NC}"
+            echo -e "  🛍️  C 端商城 (Next.js)         PID: ${CYAN}${FRONTEND_PID}${NC}  端口: ${CYAN}3000${NC}"
+            echo -e "  ⚙️  管理后台 (React + Antd)    PID: ${CYAN}${ADMIN_PID}${NC}  端口: ${CYAN}5174${NC}"
+            echo -e "  📚 文档站 (Docusaurus)        PID: ${CYAN}${DOCS_PID}${NC}  端口: ${CYAN}3001${NC}"
             echo ""
-            echo -e "${CYAN}⚙️  管理后台 (React + Antd):${NC}"
-            echo -e "  ${GREEN}./dev-start.sh admin${NC}    - http://localhost:5174"
-            echo ""
-            echo -e "${CYAN}📚 项目文档 (Docusaurus):${NC}"
-            echo -e "  ${GREEN}./dev-start.sh docs${NC}     - http://localhost:3001"
-            echo ""
-            echo -e "${YELLOW}💡 提示: 所有服务都支持外网访问${NC}"
+            echo -e "${YELLOW}提示：如需停止所有服务，可运行: ${GREEN}./dev-start.sh stop${NC}"
             ;;
         stop)
             stop_all
